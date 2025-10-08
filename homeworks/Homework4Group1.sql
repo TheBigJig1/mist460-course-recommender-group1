@@ -7,97 +7,101 @@ GO
 -- Stored Procedures, User Defined Functions, Triggers
 
 /* =================================================================================
-   1. As a student
-   I would like to know all the course offerings for the current semester for a 
-   particular course so that I can enroll in the offering that fits my schedule.
-   DONE by NADA
+    1. When a student enrolls in a Course Offering, the number of seats available should be reduced.
+    (As a student, need to know if any seats are available in a course offering) 
+    DONE BY NADA
 ================================================================================= */
-CREATE OR ALTER PROCEDURE procFindCurrentSemesterCourseOfferingsForSpecifiedCourse
-(
-    @subjectCode NVARCHAR(10),
-    @courseNumber NVARCHAR(10)
-)
-AS 
-BEGIN
-    SELECT C.SubjectCode,
-           C.CourseNumber,
-           CO.CRN,
-           CO.CourseOfferingSemester,
-           CO.CourseOfferingYear
-    FROM Course C
-    INNER JOIN CourseOffering CO
-        ON C.CourseID = CO.CourseID
-    WHERE C.SubjectCode = @subjectCode
-      AND C.CourseNumber = @courseNumber
-      AND CO.CourseOfferingYear = DATEPART(YEAR, SYSDATETIME())
-      AND CO.CourseOfferingSemester = dbo.fnFindCurrentSemester();
+
+create or alter trigger trgReduceAvailableSeats -- resulting actions we need
+on registrationCourseOffering -- table where event is happening
+
+-- trigger event/action (inserted table mimics registrationCourseOffering, 
+-- delete ( removes table) 
+-- updated (deleted, inserted)
+after insert 
+
+as
+begin
+
+declare @courseOfferingID int;
+select @courseOfferingID = CourseOfferingID
+from inserted;
+
+update CourseOffering
+set NumberSeatsRemaining = NumberSeatsRemaining -1
+where  CourseOfferingID = @courseOfferingID;
 END;
 GO
+/*
+TEST EXAMPLE: WORKS
 
--- Helper function to get the current semester based on month
-CREATE OR ALTER FUNCTION fnFindCurrentSemester()
-RETURNS NVARCHAR(20)
-AS
-BEGIN
-    DECLARE @semester NVARCHAR(20);
+select * from Registration; 
+select * from registrationCourseOffering where RegistrationID =1; 
+select * from CourseOffering where CourseOfferingID = 16; -- remaining seats = 3
 
-    IF DATEPART(MONTH, SYSDATETIME()) IN (8, 9, 10, 11, 12)
-        SET @semester = 'Fall';
-    ELSE IF DATEPART(MONTH, SYSDATETIME()) IN (1, 2, 3, 4, 5)
-        SET @semester = 'Spring';
-    ELSE
-        SET @semester = 'Summer';
-
-    RETURN @semester;
-END;
-GO
-
-/* -- Test for 1st user story: 
-   -- Shows all MIST 460 offerings for the current semester.
- 
- EXEC procFindCurrentSemesterCourseOfferingsForSpecifiedCourse 
-       @subjectCode = 'MIST', 
-       @courseNumber = '460';
+insert into registrationCourseOffering 
+(RegistrationID, CourseOfferingID, EnrollmentStatus, LastUpdate)
+values (1, 16, 'Enrolled', getdate()) 
 */
 
 
 /* =================================================================================
-   2. As a student
-   I would like to know the highly recommended jobs from alums who were in my major 
-   (name/email/industry/job title) so that I can contact the alums.
-   DONE by NADA
-   Improvment: give name of alum to be addressed
-   - Ask student for level of recommendatoin they're looking for 
+    2. When a student withdraws from a Course Offering, the number of seats available should be increased.
+    (Again, as a student, need to know if any seats are available in a course offering) 
+    DONE BY NADA
 ================================================================================= */
-CREATE OR ALTER PROCEDURE dbo.procGetRecommendedJobsByMajor
-    @Major NVARCHAR(50)
-AS
-BEGIN
-    SET NOCOUNT ON;
+create or alter trigger trgIncreaseAvailableSeats -- resulting action we need
+on RegistrationCourseOffering -- table where the event is happening
+after update -- fires after EnrollmentStatus is updated
+as
+begin
+    set nocount on;
 
-    SELECT U.Email AS AlumEmail,
-           J.JobDescription,
-           J.Industry AS JobIndustry,
-           RJ.RecommendationLevel
-    FROM Alum A
-    JOIN AppUser U ON A.AlumID = U.AppUserID
-    JOIN AlumJob RJ ON A.AlumID = RJ.AlumID
-    JOIN Job J ON RJ.JobID = J.JobID
-    ORDER BY U.Email;
-END;
-GO
+    declare @courseOfferingID int;
 
--- 2. Example test: Gives a list of alumnis (emails, jobPositions and recommendation level
--- EXEC dbo.procGetRecommendedJobsByMajor @Major = 'MIST';
+    -- get the CourseOfferingID only when EnrollmentStatus changes from Enrolled to Dropped
+    select @courseOfferingID = CourseOfferingID
+    from deleted
 
+    -- increase available seats by 1 for that course offering
+    update CourseOffering
+    set NumberSeatsRemaining = NumberSeatsRemaining + 1
+    where CourseOfferingID = @courseOfferingID;
+    end;
+    go
 
+    /*
+    TEST EXAMPLE: WORKSSSS
 
+    select * from Registration; 
+    select * from registrationCourseOffering where RegistrationID =1; 
+
+    1. excute this: 
+    select * from CourseOffering where CourseOfferingID = 16; --3
+
+    2. Excute:
+    update RegistrationCourseOffering
+    set EnrollmentStatus = 'Dropped',
+        LastUpdate = getdate()
+    where RegistrationID = 1
+    and CourseOfferingID = 16;
+
+    3. Excute again: it sould increment the NumberSeatsRemaining 
+    select * from CourseOffering where CourseOfferingID = 16; --3
+
+    */
 
 /* =================================================================================
     3. When a student is assigned a grade for a Course Offering, the student's GPA should include that grade.
     (As a student, need to know that their GPA is correctly calculated and current).
     DONE BY Jaxon
 ================================================================================= */
+
+IF COL_LENGTH('dbo.Student','GPA') IS NULL
+BEGIN
+    ALTER TABLE dbo.Student ADD GPA DECIMAL(4,3) NULL; -- store current cumulative GPA
+END;
+GO
 
 -- Convert a letter grade to grade points (4.000 scale)
 CREATE OR ALTER FUNCTION ufnGetGradePoints(@Letter NCHAR(2))
@@ -150,7 +154,6 @@ BEGIN
 END;
 GO
 
-
 /* -- Test Example:
 DECLARE @StudentID INT = 1; 
 DECLARE @TargetRCOID INT;
@@ -193,10 +196,74 @@ WHERE r.StudentID = @StudentID
 ORDER BY rco.RegistrationCourseOfferingID;
 
 GO 
+
 -- End test */
+
 
 /* =================================================================================
     4. When a student rates a course offering, the average course offering rating should include that rating.
     (As an instructor, need to know that the course rating is correct and current).
     DONE BY OLIVIA
 ================================================================================= */
+create or alter trigger trgUpdateAverageCourseRating
+on RegistrationCourseOfferingRating
+after insert, update, delete
+as
+begin
+    set nocount on;
+
+    declare @courseOfferingID int;
+
+    -- Determine the CourseOfferingID based on the operation (insert, update, delete)
+    if EXISTS (SELECT 1 FROM inserted)
+    begin
+        select @courseOfferingID = co.CourseOfferingID
+        from inserted i
+        join RegistrationCourseOffering rco ON i.RegistrationCourseOfferingID = rco.RegistrationCourseOfferingID
+        join CourseOffering co ON rco.CourseOfferingID = co.CourseOfferingID;
+    end
+    else if EXISTS (SELECT 1 FROM deleted)
+    begin
+        select @courseOfferingID = co.CourseOfferingID
+        from deleted d
+        join RegistrationCourseOffering rco ON d.RegistrationCourseOfferingID = rco.RegistrationCourseOfferingID
+        join CourseOffering co ON rco.CourseOfferingID = co.CourseOfferingID;
+    end
+
+    -- Update the CourseOfferingAverageRating for the CourseOffering
+    if @courseOfferingID is not null
+    begin
+        update CourseOffering
+        set CourseOfferingAverageRating = (
+            select AVG(CAST(RatingValue AS FLOAT))
+            from RegistrationCourseOfferingRating rcor
+            join RegistrationCourseOffering rco ON rcor.RegistrationCourseOfferingID = rco.RegistrationCourseOfferingID
+            where rco.CourseOfferingID = @courseOfferingID
+        )
+        where CourseOfferingID = @courseOfferingID;
+    end
+end;
+go
+/*
+TEST EXAMPLE: WORKS
+select * from CourseOffering where CourseOfferingID = 16; -- CourseOfferingAverageRating is null
+    insert into RegistrationCourseOfferingRating
+        (RegistrationCourseOfferingID, RatingValue, Comments)
+        values (16, 5, 'Great course!') -- assuming 16 is a valid RegistrationCourseOfferingID
+
+select * from CourseOffering where CourseOfferingID = 16; -- CourseOfferingAverageRating is now 5
+    insert into RegistrationCourseOfferingRating
+        (RegistrationCourseOfferingID, RatingValue, Comments)
+        values (16, 3, 'Good course!') -- assuming 16 is a valid RegistrationCourseOfferingID
+
+select * from CourseOffering where CourseOfferingID = 16; -- CourseOfferingAverageRating is now 4
+    update RegistrationCourseOfferingRating
+    set RatingValue = 4
+        where RegistrationCourseOfferingRatingID = 1; -- assuming 1 is a valid RegistrationCourseOfferingID
+
+select * from CourseOffering where CourseOfferingID = 16; -- CourseOfferingAverageRating is now 3.5
+    delete from RegistrationCourseOfferingRating
+        where RegistrationCourseOfferingRatingID = 1; -- assuming 1 is a valid RegistrationCourseOfferingID
+
+select * from CourseOffering where CourseOfferingID = 16; -- CourseOfferingAverageRating is now 4
+*/
