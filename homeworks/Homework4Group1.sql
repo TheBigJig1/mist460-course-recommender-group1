@@ -1,6 +1,6 @@
 -- Homework 4 - Group 1
 -- Authors: Nada Mikky, Jaxon Fielding, Olivia Gottlieb
--- Description: Deliverable file, contains Stored Procedures, UDFs, and Triggers for MIS assignment
+-- Description: contains Stored Procedures, UDFs, and Triggers for MIS assignment
 USE MIST460_RelationalDatabase_Lastname;
 GO
 
