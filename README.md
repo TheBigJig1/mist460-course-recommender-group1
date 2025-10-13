@@ -1,5 +1,8 @@
 # MIST460-Group1
-Hospital Alert System
+Hospital Alert System:
+A system that can help administrators better prepare and divide resources by predicting surges or lulls in patient volume. 
+An agentic system would actively monitor all these factors (and more) and, when prompted by a user, provide recommendations on the best course of action.
+
 
 # USER STORIES
 1. As an ER doctor, 
