@@ -1,1 +1,7 @@
 /doc/
+.venv
+
+pyproject.toml
+.python-version
+__pypackages__/
+uv.lock
