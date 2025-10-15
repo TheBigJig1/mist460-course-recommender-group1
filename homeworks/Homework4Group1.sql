@@ -4,7 +4,7 @@
 USE MIST460_RelationalDatabase_Lastname;
 GO
 
--- Stored Procedures, User Defined Functions, Triggers
+-- Stored Procedures, User Defined Functions, TRIGGERS
 
 /* =================================================================================
     1. When a student enrolls in a Course Offering, the number of seats available should be reduced.
