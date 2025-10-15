@@ -26,3 +26,6 @@ I need a system that monitors hospital usage patterns and predicts supply needs 
 7. As a hospital administrator, 
 I want a system that forecasts patient surges based on seasonal and local data, so that I can optimize staff schedules and prepare resources in advance
 
+----------------------------------------------------------------------------------------------
+#Class Diagram Link (Lucid chart):
+(https://lucid.app/lucidchart/1da28367-8efb-4d64-9b78-4f709f1d45a0/edit?viewport_loc=-3737%2C-1419%2C4212%2C1825%2C0_0&invitationId=inv_9f1ff052-4191-4fd4-83f5-79fc137c28e1)
